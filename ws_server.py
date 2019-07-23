@@ -35,15 +35,17 @@ async def producer_handler(websocket, path):
     connected.add(websocket)
     print("Client's connected")
     try:
-        while True:
-            mes = await producer()
-            await websocket.send(mes)
-            async for message in websocket:
-                await consumer(message)
-                break
+        await asyncio.wait([ws.send("ping") for ws in connected])
+        await asyncio.sleep(10)
     finally:
         print("Client's unconnected")
         connected.remove(websocket)
+    # while True:
+    #     mes = await producer()
+    #     await websocket.send(mes)
+    #     async for message in websocket:
+    #         await consumer(message)
+    #         break
 
 start_server = websockets.serve(producer_handler, "0.0.0.0", 8765)
 
