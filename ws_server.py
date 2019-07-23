@@ -33,13 +33,17 @@ def _set_assembly_num():
 
 async def producer_handler(websocket, path):
     connected.add(websocket)
-    print(connected)
-    while True:
-        mes = await producer()
-        await websocket.send(mes)
-        async for message in websocket:
-            await consumer(message)
-            break
+    print("Client's connected")
+    try:
+        while True:
+            mes = await producer()
+            await websocket.send(mes)
+            async for message in websocket:
+                await consumer(message)
+                break
+    finally:
+        print("Client's unconnected")
+        connected.remove(websocket)
 
 start_server = websockets.serve(producer_handler, "0.0.0.0", 8765)
 
