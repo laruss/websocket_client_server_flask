@@ -2,6 +2,8 @@ import asyncio
 import websockets
 from settings import *
 
+connected = set()
+
 async def consumer(message):
     # message in "completed","failed"
     _dict = open_json()
@@ -30,6 +32,8 @@ def _set_assembly_num():
     save_json(_dict)
 
 async def producer_handler(websocket, path):
+    connected.add(websocket)
+    print(connected)
     while True:
         mes = await producer()
         await websocket.send(mes)
@@ -37,7 +41,7 @@ async def producer_handler(websocket, path):
             await consumer(message)
             break
 
-start_server = websockets.serve(producer_handler, "localhost", 8765)
+start_server = websockets.serve(producer_handler, "0.0.0.0", 8765)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
