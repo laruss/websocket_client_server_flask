@@ -3,6 +3,7 @@ import websockets
 from settings import *
 
 connected = set()
+message_to_send = None
 
 async def consumer(message):
     # message in "completed","failed"
@@ -12,6 +13,7 @@ async def consumer(message):
     save_json(_dict)
 
 async def producer():
+    global message_to_send
     not_calling = True
     while not_calling:
         sleep(1)
@@ -20,7 +22,7 @@ async def producer():
             print(assembly)
             not_calling = False
             _set_assembly_num()
-    return assembly
+    message_to_send = assembly
 
 def _get_assembly_num():
     _dict = open_json()
@@ -36,9 +38,13 @@ async def producer_handler(websocket, path):
     print("Client's connected")
     try:
         await asyncio.wait([ws.send("ping") for ws in connected])
+        await producer()
+        await websocket.send(message_to_send)
+        async for message in websocket:
+            await consumer(message)
         await asyncio.sleep(10)
     finally:
-        print("Client's unconnected")
+        print("Client's disconnected")
         connected.remove(websocket)
     # while True:
     #     mes = await producer()
