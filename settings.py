@@ -3,6 +3,7 @@ import json
 from time import sleep
 
 JSON_NAME = 'assembly.json'
+NO_CLIENTS = False
 
 def open_json():
     _dict = {}

@@ -26,6 +26,8 @@ def runTests():
 
 def get_tests_status(assemblyNum):
     json_dict = open_json()
+    if json_dict['no_clients']:
+        return False
     json_dict.update({"assembly":assemblyNum})
     json_dict.update({'status':''})
     save_json(json_dict)
