@@ -4,6 +4,7 @@ from time import sleep
 
 JSON_NAME = 'assembly.json'
 NO_CLIENTS = False
+SECS_TO_PING = 5
 
 def open_json():
     _dict = {}

@@ -1,76 +1,113 @@
 import asyncio
-import websockets
+import websockets, os
 from settings import *
+from time import sleep
 
-connected = set()
-message_to_send = None
+assembly = ''
+test_result = ''
+test_request_sent = False
+client_connected = False
 
-async def consumer(message):
-    # message in "completed","failed"
-    _dict = open_json()
-    print(message)
-    _dict.update({'status':message})
-    save_json(_dict)
+def error_handler(func):
+    async def decorator(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except:
+            print("client disconnected")
+            return False
+    return decorator
 
-async def producer(websocket):
-    global message_to_send
-    not_calling = True
-    while not_calling:
-        sleep(1)
-        assembly = _get_assembly_num()
-        if assembly != '':
-            not_calling = False
-            _set_assembly_num()
-    try:
+class Server:
+
+    def get_port(self):
+        return os.getenv('WS_PORT', '8765')
+
+    def get_host(self):
+        return os.getenv('WS_HOST', '0.0.0.0')
+
+    def start(self):
+        return websockets.serve(self.handler, self.get_host(), self.get_port())
+
+    @error_handler
+    async def ping(self, websocket):
         await websocket.send('ping')
-    except:
-        print('no consumers, failed')
-        return None
-    return assembly
+        # print('pinged')
+        await asyncio.sleep(SECS_TO_PING)
+        return True
 
-async def set_no_clients_to(boolean):
+    @error_handler
+    async def send_test_request(self, websocket):
+        global test_request_sent
+        if assembly and not test_request_sent:
+            print("Sending assembly to ws_client")
+            await websocket.send(assembly)
+            test_request_sent = True
+            print("assembly was sent to ws_client")
+        return True
+
+    @error_handler
+    async def check_test_results(self, websocket):
+        global test_result
+        if assembly and test_request_sent and not test_result:
+            message = await websocket.recv()
+            if message != 'pong':
+                test_result = message
+                print('Test results were recieved :', message)
+        return True
+
+
+    async def handler(self, websocket, path):
+        global client_connected
+        print("client is connected")
+        client_connected = True
+        while client_connected:
+            client_connected = await self.ping(websocket)
+            await asyncio.sleep(0)
+            if client_connected:
+                client_connected = await self.send_test_request(websocket)
+                await self.check_test_results(websocket)
+
+
+def check_assembly_num():
+    global assembly
     _dict = open_json()
-    _dict.update({'no_clients':boolean})
+    if _dict["assembly"]:
+        assembly = _dict["assembly"]
+        _dict.update({'assembly':''})
+        save_json(_dict)
+        print("Assembly in json was changed to", assembly)
+
+def set_test_result():
+    global test_result, assembly, test_request_sent
+    _dict = open_json()
+    _dict.update({'status':test_result})
     save_json(_dict)
+    print("test results were wrote to JSON")
+    test_result = ''
+    test_request_sent = False
+    assembly = ''
 
-def _get_assembly_num():
-    _dict = open_json()
-    return _dict["assembly"]
-
-def _set_assembly_num():
-    _dict = open_json()
-    _dict.update({'assembly':''})
-    save_json(_dict)
-
-async def consumer_handler(websocket, path):
-    async for message in websocket:
-        await consumer(message)
-
-async def producer_handler(websocket, path):
+async def json_handler():
     while True:
-        mes = await producer(websocket)
-        if mes: await websocket.send(mes)
-        else: await consumer('failed')
-        async for message in websocket:
-            await consumer(message)
-            break
+        await asyncio.sleep(1)
+        if not assembly:
+            check_assembly_num()
+        else:
+            if test_result:
+                set_test_result()
 
-async def handler(websocket, path):
-    connected.add(websocket)
-    print('consumer connected')
-    await set_no_clients_to(False)
-    try:
-        await asyncio.wait([producer_handler(websocket, path) for ws in connected])
-    finally:
-        await consumer('failed')
-        await set_no_clients_to(True)
-        connected.remove(websocket)
-        print('consumer disconnected')
+async def ws_status_checker():
+    global test_result
+    while True:
+        await asyncio.sleep(2)
+        if assembly and not client_connected and not test_request_sent:
+            test_result = 'failed'
+            print("Client is disconnected, not test_request_sent, test_result set to failed")
 
-
-start_server = websockets.serve(handler, "0.0.0.0", 8765)
-
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
-
-# async def main_loop():
+if __name__ == '__main__':
+  ws = Server()
+  loop = asyncio.get_event_loop()
+  loop.create_task(json_handler())
+  loop.run_until_complete(ws.start())
+  loop.create_task(ws_status_checker())
+  loop.run_forever()
