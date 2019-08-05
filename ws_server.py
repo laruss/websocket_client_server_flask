@@ -2,6 +2,7 @@ import asyncio
 import websockets, os
 from settings import *
 from time import sleep
+from quart import Quart, request, Response, jsonify
 
 assembly = ''
 test_result = ''
@@ -26,6 +27,7 @@ class Server:
         return os.getenv('WS_HOST', '0.0.0.0')
 
     def start(self):
+        print("Websocket Server is running on {}:{}".format(self.get_host(), self.get_port()))
         return websockets.serve(self.handler, self.get_host(), self.get_port())
 
     @error_handler
@@ -67,47 +69,51 @@ class Server:
                 client_connected = await self.send_test_request(websocket)
                 await self.check_test_results(websocket)
 
-
-def check_assembly_num():
-    global assembly
-    _dict = open_json()
-    if _dict["assembly"]:
-        assembly = _dict["assembly"]
-        _dict.update({'assembly':''})
-        save_json(_dict)
-        print("Assembly in json was changed to", assembly)
-
-def set_test_result():
-    global test_result, assembly, test_request_sent
-    _dict = open_json()
-    _dict.update({'status':test_result})
-    save_json(_dict)
-    print("test results were wrote to JSON")
-    test_result = ''
-    test_request_sent = False
-    assembly = ''
-
-async def json_handler():
-    while True:
-        await asyncio.sleep(1)
-        if not assembly:
-            check_assembly_num()
-        else:
-            if test_result:
-                set_test_result()
-
 async def ws_status_checker():
     global test_result
     while True:
         await asyncio.sleep(2)
         if assembly and not client_connected and not test_request_sent:
+            await asyncio.sleep(5)
             test_result = 'failed'
             print("Client is disconnected, not test_request_sent, test_result set to failed")
+
+# http-server
+app = Quart(__name__)
+
+@app.route('/')
+async def mainPage():
+    return "This is a main page of webserver. Go to /start_tests/?assembly=<assembly_number> to run tests"
+
+@app.route("/start_tests/", methods=['GET'])
+async def runTests():
+    global assembly, test_result
+    secs_passed = 0
+    try:
+        if client_connected:
+            assembly = request.args['assembly']
+            resp = Response('success')
+            while not test_result:
+                await asyncio.sleep(1)
+                secs_passed += 1
+                if secs_passed > SECS_TO_FAIL_RESPONSE:
+                    print('timeout failed')
+                    test_result = 'failed'
+                    break
+                print(secs_passed)
+            if test_result == 'failed':
+                resp = Response('failed', status=400)
+        else:
+            resp = Response('failed', status=400)
+        test_result = ''
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp
+    except KeyError:
+        return mainPage()
 
 if __name__ == '__main__':
   ws = Server()
   loop = asyncio.get_event_loop()
-  loop.create_task(json_handler())
   loop.run_until_complete(ws.start())
   loop.create_task(ws_status_checker())
-  loop.run_forever()
+  app.run(port=5001, loop=loop)
