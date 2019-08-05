@@ -116,4 +116,4 @@ if __name__ == '__main__':
   loop = asyncio.get_event_loop()
   loop.run_until_complete(ws.start())
   loop.create_task(ws_status_checker())
-  app.run(port=HTTP_PORT, loop=loop)
+  app.run(host='0.0.0.0', port=HTTP_PORT, loop=loop)
