@@ -6,6 +6,8 @@ JSON_NAME = 'assembly.json'
 NO_CLIENTS = False
 SECS_TO_PING = 5
 SECS_TO_FAIL_RESPONSE = 1000
+HTTP_PORT = 80
+WS_PORT = '8765'
 
 def open_json():
     _dict = {}

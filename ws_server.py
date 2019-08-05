@@ -21,7 +21,7 @@ def error_handler(func):
 class Server:
 
     def get_port(self):
-        return os.getenv('WS_PORT', '8765')
+        return os.getenv('WS_PORT', WS_PORT)
 
     def get_host(self):
         return os.getenv('WS_HOST', '0.0.0.0')
@@ -116,4 +116,4 @@ if __name__ == '__main__':
   loop = asyncio.get_event_loop()
   loop.run_until_complete(ws.start())
   loop.create_task(ws_status_checker())
-  app.run(port=5001, loop=loop)
+  app.run(port=HTTP_PORT, loop=loop)
