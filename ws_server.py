@@ -72,7 +72,8 @@ class Server:
 async def ws_status_checker():
     global test_result
     while True:
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
+        # print("assembly", assembly, "client_connected", client_connected, "test_request_sent", test_request_sent)
         if assembly and not client_connected and not test_request_sent:
             await asyncio.sleep(5)
             test_result = 'failed'
@@ -87,7 +88,7 @@ async def mainPage():
 
 @app.route("/start_tests/", methods=['GET'])
 async def runTests():
-    global assembly, test_result
+    global assembly, test_result, test_request_sent
     secs_passed = 0
     try:
         if client_connected:
@@ -105,7 +106,10 @@ async def runTests():
                 resp = Response('failed', status=400)
         else:
             resp = Response('failed', status=400)
+        print("sending response to http client,", resp)
         test_result = ''
+        assembly = ''
+        test_request_sent = False
         resp.headers['Access-Control-Allow-Origin'] = '*'
         return resp
     except KeyError:
