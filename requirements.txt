@@ -1,2 +1,2 @@
-websockets==8.0
+websockets==9.1
 Quart==0.9.1
